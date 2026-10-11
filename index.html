@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Leora Studio</title>
+<meta name="description" content="Publicaciones y estadísticas de Animals Kids, Leora y Fuera Tóxicos.">
+<meta name="theme-color" content="#c2387a">
+<meta name="robots" content="noindex, nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Leora Studio">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <img src="icons/icon-192.png" alt="" width="36" height="36">
+      <h1>Leora Studio</h1>
+    </div>
+    <div class="upd">
+      <span id="upd-txt" class="muted">Cargando…</span>
+      <button type="button" id="upd-btn">↻ Actualizar</button>
+    </div>
+  </header>
+
+  <nav class="accts" id="accts" aria-label="Cuenta"></nav>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="resumen">Resumen</button>
+    <button class="tab" role="tab" data-tab="publicaciones">Publicaciones</button>
+    <button class="tab" role="tab" data-tab="calendario">Calendario</button>
+  </div>
+
+  <main id="view"><p class="notice">Cargando…</p></main>
+</div>
+<script src="data/datos.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

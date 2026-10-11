@@ -1,0 +1,16 @@
+{
+  "name": "Leora Studio",
+  "short_name": "Leora Studio",
+  "description": "Publicaciones y estadísticas de Animals Kids, Leora y Fuera Tóxicos.",
+  "lang": "es",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#12141c",
+  "theme_color": "#c2387a",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
