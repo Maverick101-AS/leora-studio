@@ -1,5 +1,5 @@
 // Guarda la app para abrirla sin conexión. Los datos siempre se piden primero a la red.
-const CACHE = "leora-studio-v2";
+const CACHE = "leora-studio-v3";
 const BASE = ["./", "index.html", "styles.css", "app.js", "manifest.webmanifest", "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png"];
 
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(BASE)).then(() => self.skipWaiting())); });

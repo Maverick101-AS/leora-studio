@@ -68,7 +68,7 @@ async function cargar(manual) {
     escribir("ls-datos", txt);
   } catch (e) {
     S.error = e;
-    if (e.clave) S.pedirClave = true;
+    if (e.clave) { S.pedirClave = true; escribir("ls-clave", null); }
   }
   render();
 }
@@ -118,6 +118,7 @@ function ultimaFecha() {
 }
 function pintarEstado() {
   const el = $("upd-txt");
+  if (S.pedirClave) { el.textContent = "Falta la clave de GitHub"; el.className = "old"; return; }
   if (!S.datos) { el.textContent = S.error ? "Sin conexión y sin datos guardados" : "Cargando…"; el.className = "old"; return; }
   const d = ultimaFecha(), viejo = d && (Date.now() - d) > 36 * 3600e3;
   el.className = viejo || S.error ? "old" : "muted";
