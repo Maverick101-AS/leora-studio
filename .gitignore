@@ -1,5 +1,5 @@
-data/
-img/
-tools/
-.export/
+/data/
+/img/
+/tools/
+/.export/
 .DS_Store
