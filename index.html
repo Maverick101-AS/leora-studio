@@ -39,7 +39,7 @@
 
   <main id="view"><p class="notice">Cargando…</p></main>
 </div>
-<script src="data/datos.js"></script>
+<script>if (location.protocol === "file:") document.write('<script src="data/datos.js"><\/script>');</script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -38,19 +38,23 @@ function imgDe(p) {
 
 /* ---------- Carga de datos ---------- */
 // Abierta desde el archivo (Mac): los datos vienen en data/datos.js junto a la app.
-// Publicada: los datos están en un repositorio privado de GitHub y se leen con una clave de solo lectura guardada en este dispositivo.
+// Publicada: los datos y las portadas están cifrados (AES-256-GCM) en cifrado/ y se descifran aquí con la contraseña.
+// En cada dispositivo se guarda la clave derivada (no la contraseña) para no pedirla otra vez.
 const LOCAL = location.protocol === "file:";
-const REPO_DATOS = "Maverick101-AS/leora-studio-datos";
 const leer = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const escribir = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} };
+const deB64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const aB64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
+let CLAVE = null;
 
-async function deGithub(ruta) {
-  const r = await fetch(`https://api.github.com/repos/${REPO_DATOS}/contents/${ruta}`, {
-    cache: "no-store", headers: { Accept: "application/vnd.github.raw+json", Authorization: "Bearer " + leer("ls-clave") } });
-  if (r.status === 401 || r.status === 403 || r.status === 404) { const e = new Error("clave"); e.clave = true; throw e; }
+const importar = bits => crypto.subtle.importKey("raw", bits, "AES-GCM", false, ["decrypt"]);
+const descifrar = (bytes, key) => crypto.subtle.decrypt({ name: "AES-GCM", iv: bytes.slice(0, 12) }, key, bytes.slice(12));
+async function sobre() {
+  const r = await fetch("cifrado/datos.json?t=" + Date.now(), { cache: "no-store" });
   if (!r.ok) throw new Error("HTTP " + r.status);
-  return r;
+  return r.json();
 }
+const malaClave = e => e && e.name === "OperationError";
 
 async function cargar(manual) {
   if (LOCAL) {
@@ -58,33 +62,51 @@ async function cargar(manual) {
     S.datos = window.DATOS || null; S.cargadoEn = new Date(); S.error = S.datos ? null : new Error("sin datos");
     render(); return;
   }
-  if (!leer("ls-clave")) { S.pedirClave = true; render(); return; }
+  if (!window.crypto?.subtle) { S.error = new Error("cifrado"); render(); return; }
+  if (!CLAVE && leer("ls-k")) { try { CLAVE = await importar(deB64(leer("ls-k"))); } catch (e) {} }
+  if (!CLAVE) { S.pedirClave = true; render(); return; }
   if (!S.datos) { try { S.datos = JSON.parse(leer("ls-datos") || "null"); } catch (e) {} }
   if (manual) { $("upd-txt").textContent = "Actualizando…"; $("upd-txt").className = "muted"; }
   try {
-    const r = await deGithub("data/datos.json");
-    const txt = await r.text();
+    const s = await sobre();
+    const txt = new TextDecoder().decode(await descifrar(deB64(s.dato), CLAVE));
     S.datos = JSON.parse(txt); S.cargadoEn = new Date(); S.error = null; S.pedirClave = false;
     escribir("ls-datos", txt);
   } catch (e) {
-    S.error = e;
-    if (e.clave) { S.pedirClave = true; escribir("ls-clave", null); }
+    // Si la contraseña ha cambiado, la clave guardada deja de valer: se vuelve a pedir.
+    if (malaClave(e)) { S.pedirClave = true; S.error = { clave: true }; CLAVE = null; escribir("ls-k", null); escribir("ls-datos", null); S.datos = null; }
+    else S.error = e;
   }
   render();
 }
 
-// Las portadas también son privadas: se descargan con la clave y se guardan en el dispositivo para verlas sin conexión.
+async function entrar(pass) {
+  $("upd-txt").textContent = "Comprobando…"; $("upd-txt").className = "muted";
+  try {
+    const s = await sobre();
+    const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pass), "PBKDF2", false, ["deriveBits"]);
+    const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: deB64(s.sal), iterations: s.iter }, base, 256);
+    const key = await importar(bits);
+    await descifrar(deB64(s.dato), key);
+    CLAVE = key; escribir("ls-k", aB64(bits)); S.pedirClave = false; S.error = null;
+  } catch (e) {
+    S.error = malaClave(e) ? { clave: true } : e;
+  }
+  if (CLAVE) cargar(); else render();
+}
+
+// Las portadas también van cifradas: se descargan (el service worker las guarda para verlas sin conexión) y se descifran aquí.
 const urlsImg = {};
 async function hidratarImagenes() {
-  if (LOCAL) return;
-  const cache = await caches.open("leora-studio-img").catch(() => null);
+  if (LOCAL || !CLAVE) return;
   for (const el of document.querySelectorAll("img[data-src]")) {
     const ruta = el.dataset.src;
     if (urlsImg[ruta]) { el.src = urlsImg[ruta]; continue; }
     try {
-      let r = cache && await cache.match(ruta);
-      if (!r) { r = await deGithub(ruta); if (cache) await cache.put(ruta, r.clone()); }
-      urlsImg[ruta] = URL.createObjectURL(await r.blob());
+      const r = await fetch("cifrado/" + ruta.replace(/\.jpg$/, ".bin"));
+      if (!r.ok) continue;
+      const plano = await descifrar(new Uint8Array(await r.arrayBuffer()), CLAVE);
+      urlsImg[ruta] = URL.createObjectURL(new Blob([plano], { type: "image/jpeg" }));
       document.querySelectorAll(`img[data-src="${CSS.escape(ruta)}"]`).forEach(i => i.src = urlsImg[ruta]);
     } catch (e) {}
   }
@@ -93,21 +115,13 @@ const imgTag = (ruta, cls) => LOCAL ? `<img${cls ? ` class="${cls}"` : ""} src="
   : `<img${cls ? ` class="${cls}"` : ""} data-src="${esc(ruta)}" src="${urlsImg[ruta] || "data:image/gif;base64,R0lGODlhAQABAAAAACw="}" alt="">`;
 
 function vistaClave() {
-  const err = S.error?.clave ? `<p class="notice" style="color:var(--warn)">GitHub no ha aceptado esa clave. Revisa que tenga acceso al repositorio leora-studio-datos con permiso de lectura.</p>` : "";
-  return `<section class="panel"><h2>Conectar los datos</h2>${err}
-    <p>Tus datos están en un repositorio privado de GitHub. Para verlos en este dispositivo, pega una clave de solo lectura (solo hay que hacerlo una vez en cada dispositivo).</p>
-    <ol style="margin:0;padding-left:20px;display:grid;gap:4px">
-      <li>Abre <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com → Fine-grained token nuevo</a>.</li>
-      <li>Nombre: «Leora Studio». Caducidad: la más larga que te deje.</li>
-      <li>Repository access: «Only select repositories» → <b>leora-studio-datos</b>.</li>
-      <li>Permissions → Repository permissions → <b>Contents: Read-only</b>. Nada más.</li>
-      <li>Pulsa «Generate token», cópialo y pégalo aquí.</li>
-    </ol>
+  const err = S.error?.clave ? `<p class="notice" style="color:var(--warn)">Contraseña incorrecta.</p>` : "";
+  return `<section class="panel"><h2>Contraseña</h2>${err}
+    <p style="margin:0">Escribe la contraseña de Leora Studio. Solo te la pedirá una vez en este dispositivo.</p>
     <form id="f-clave" style="display:flex;gap:8px;flex-wrap:wrap">
-      <input id="i-clave" type="password" autocomplete="off" placeholder="github_pat_…" style="flex:1;min-width:220px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)">
-      <button class="btn" type="submit">Guardar</button>
-    </form>
-    <p class="muted" style="font-size:12px;margin:0">La clave se guarda solo en este dispositivo y solo permite leer ese repositorio.</p></section>`;
+      <input id="i-clave" type="password" autocomplete="current-password" placeholder="Contraseña" style="flex:1;min-width:200px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font-size:16px">
+      <button class="btn" type="submit">Entrar</button>
+    </form></section>`;
 }
 
 function ultimaFecha() {
@@ -118,7 +132,7 @@ function ultimaFecha() {
 }
 function pintarEstado() {
   const el = $("upd-txt");
-  if (S.pedirClave) { el.textContent = "Falta la clave de GitHub"; el.className = "old"; return; }
+  if (S.pedirClave) { el.textContent = "Falta la contraseña"; el.className = "old"; return; }
   if (!S.datos) { el.textContent = S.error ? "Sin conexión y sin datos guardados" : "Cargando…"; el.className = "old"; return; }
   const d = ultimaFecha(), viejo = d && (Date.now() - d) > 36 * 3600e3;
   el.className = viejo || S.error ? "old" : "muted";
@@ -252,16 +266,16 @@ function render() {
   pintarEstado(); pintarCuentas();
   if (S.pedirClave) {
     $("view").innerHTML = vistaClave();
-    $("f-clave").onsubmit = ev => { ev.preventDefault(); const v = $("i-clave").value.trim(); if (!v) return; escribir("ls-clave", v); S.error = null; cargar(true); };
+    $("f-clave").onsubmit = ev => { ev.preventDefault(); const v = $("i-clave").value; if (!v) return; entrar(v); };
     return;
   }
   if (!S.datos) { $("view").innerHTML = `<p class="notice">${S.error ? "No se han podido cargar los datos. Comprueba la conexión y pulsa Actualizar." : "Cargando…"}</p>`; return; }
   $("view").innerHTML = (S.tab === "publicaciones" ? vistaPublicaciones() : S.tab === "calendario" ? vistaCalendario() : vistaResumen())
-    + (LOCAL ? "" : `<p class="muted" style="font-size:12px;text-align:center;margin:8px 0 0"><button type="button" class="btn" id="b-clave" style="font-size:12px;padding:3px 10px">Cambiar clave de GitHub</button></p>`);
+    + (LOCAL ? "" : `<p class="muted" style="font-size:12px;text-align:center;margin:8px 0 0"><button type="button" class="btn" id="b-clave" style="font-size:12px;padding:3px 10px">Cerrar sesión en este dispositivo</button></p>`);
   $("view").querySelectorAll("[data-mes]").forEach(b => b.onclick = () => {
     const k = +b.dataset.mes; if (k) S.mes.setMonth(S.mes.getMonth() + k); else { S.mes = new Date(); S.mes.setDate(1); } render();
   });
-  if ($("b-clave")) $("b-clave").onclick = () => { S.pedirClave = true; render(); };
+  if ($("b-clave")) $("b-clave").onclick = () => { CLAVE = null; escribir("ls-k", null); escribir("ls-datos", null); S.datos = null; S.error = null; S.pedirClave = true; render(); };
   hidratarImagenes();
 }
 document.querySelectorAll(".tab").forEach(t => t.onclick = () => { S.tab = t.dataset.tab; guardarUi(); render(); });
