@@ -4,42 +4,35 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Leora Studio</title>
-<meta name="description" content="Publicaciones y estadísticas de Animals Kids, Leora y Fuera Tóxicos.">
-<meta name="theme-color" content="#c2387a">
 <meta name="robots" content="noindex, nofollow">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#c2387a">
 <meta name="apple-mobile-web-app-title" content="Leora Studio">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="stylesheet" href="styles.css">
+<style>
+  :root { color-scheme: light dark }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #12141c; color: #e8eaf3;
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; text-align: center; padding: 24px }
+  img { width: 112px; height: 112px; border-radius: 26px }
+  a { display: inline-block; margin-top: 18px; padding: 12px 22px; border-radius: 99px; background: #c2387a; color: #fff; font-weight: 700; text-decoration: none }
+  p { color: #9aa1b8; font-size: 14px; max-width: 320px; margin: 14px auto 0 }
+</style>
 </head>
 <body>
-<div class="wrap">
-  <header class="top">
-    <div class="brand">
-      <img src="icons/icon-192.png" alt="" width="36" height="36">
-      <h1>Leora Studio</h1>
-    </div>
-    <div class="upd">
-      <span id="upd-txt" class="muted">Cargando…</span>
-      <button type="button" id="upd-btn">↻ Actualizar</button>
-    </div>
-  </header>
-
-  <nav class="accts" id="accts" aria-label="Cuenta"></nav>
-
-  <div class="tabs" role="tablist">
-    <button class="tab" role="tab" data-tab="resumen">Resumen</button>
-    <button class="tab" role="tab" data-tab="publicaciones">Publicaciones</button>
-    <button class="tab" role="tab" data-tab="calendario">Calendario</button>
-  </div>
-
-  <main id="view"><p class="notice">Cargando…</p></main>
-</div>
-<script>if (location.protocol === "file:") document.write('<script src="data/datos.js"><\/script>');</script>
-<script src="app.js"></script>
+<main>
+  <img src="icons/icon-512.png" alt="Leora Studio">
+  <div><a id="ir" href="https://claude.ai/artifact/EsuETWBqqhcmhoZqXEgzxz">Abrir Leora Studio</a></div>
+  <p>Se abre en claude.ai con tu cuenta. Para tenerlo como app: Compartir → «Añadir a pantalla de inicio».</p>
+</main>
+<script>
+  // La primera vez se queda aquí para poder añadirla a la pantalla de inicio; las siguientes
+  // (al pulsar el icono) pasa directamente a Leora Studio. Con ?quedarse no salta nunca.
+  let visto = null; try { visto = localStorage.getItem("ls-lanzador"); localStorage.setItem("ls-lanzador", "1"); } catch (e) {}
+  if (visto && !/[?&]quedarse\b/.test(location.search)) location.replace(document.getElementById("ir").href);
+  // Quita la versión anterior de la app (service worker y cachés) si quedó instalada.
+  if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(() => {});
+  if (window.caches) caches.keys().then(ks => ks.forEach(k => caches.delete(k))).catch(() => {});
+</script>
 </body>
 </html>
